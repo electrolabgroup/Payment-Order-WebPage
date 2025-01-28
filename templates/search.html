@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payment Order Search</title>
+    <style>
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .search-box {
+            margin: 10px 0;
+            padding: 20px;
+            background-color: #cacccc;
+            border-radius: 5px;
+        }
+        .info-box {
+            background-color: #ffffff;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .references-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .references-table th, .references-table td {
+            border: 1px solid #a74e4e;
+            padding: 8px;
+            text-align: left;
+        }
+        .references-table th {
+            background-color: black; 
+            color: white;
+        }
+        input[type="text"] {
+            padding: 8px;
+            margin-right: 10px;
+        }
+        .search-input {
+            width: 508px;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .otp-button {
+            margin-top: 20px;
+            background-color: #28a745;
+        }
+        .otp-button:hover {
+            background-color: #218838;
+        }
+        .flash-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .verify-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .verify-input {
+            width: 250px;
+        }
+        .form-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center; 
+            justify-content: center; 
+            margin-top: 20px;
+        }
+
+        .verify-section {
+            margin-top: 20px;
+            text-align: center;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            width: 100%;
+            max-width: 400px; 
+        }
+
+        .otp-button, .verify-input, .verify-form button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .suggestions-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        position: absolute;
+        width: calc(100% - 30px); 
+        background-color: #fff;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        z-index: 100;
+        max-height: 300px; 
+        overflow-y: auto;
+        display: none; 
+    }
+    .suggestions-list li {
+        padding: 10px;
+        cursor: pointer;
+        border-bottom: 1px solid #ddd;
+        transition: background-color 0.2s ease-in-out;
+    }
+
+    .suggestions-list li:hover {
+        background-color: #f1f1f1;
+    }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Payment Order Search</h1>
+        
+
+        
+        <div class="search-box">
+            <form method="POST">
+                <input type="text" name="search_term" id="search_input" placeholder="Enter payment order name..." class="search-input">
+                <button type="submit">Search</button>
+            </form>
+            <ul id="suggestions" class="suggestions-list"></ul>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash-message">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}       
+
+        {% if search_results %}
+            {% for result in search_results %}
+                <div class="info-box">
+                    <h3>Payment Order: {{ result['name'] }}</h3>
+                    <p>Posting Date: {{ result['posting_date'].strftime('%Y-%m-%d') }}</p>
+                    <p>Account: {{ result['account'] }}</p>
+                    <p>Company: {{ result['company'] }}</p>
+                    <p>Payment Order Type: {{ result['payment_order_type'] }}</p>
+                    <p>Company Bank Account: {{ result['company_bank_account'] }}</p>
+                    <p>Company Bank: {{ result['company_bank'] }}</p>
+                    <p>Verified: {{ result['custom_verifier_1'] }}</p>
+                    <p>Authorized: {{ result['custom_verifier_2'] }}</p>
+
+                    <table class="references-table">
+                        <thead>
+                            <tr>
+                                <th>Reference Name</th>
+                                <th>Amount</th>
+                                <th>Supplier</th>
+                                <th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ref in result['references'] %}
+                                <tr>
+                                    <td>{{ ref['reference_name'] }}</td>
+                                    <td>{{ ref['amount'] }}</td>
+                                    <td>{{ ref['supplier'] }}</td>
+                                    <td>{{ ref['reference_doctype'] }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    <div class="form-container">
+                        <form method="POST">
+                            <input type="hidden" name="order_name" value="{{ result['name'] }}">
+                            <button type="submit" name="send_otp" class="otp-button">Make Payment</button>
+                        </form>
+                    
+                        {% if show_otp_form and session.get('order_name') == result['name'] %}
+                            <div class="verify-section">
+                                <h4>Verify OTP</h4>
+                                <form method="POST" class="verify-form">
+                                    <input type="text" name="otp" placeholder="Enter OTP" required class="verify-input">
+                                    <button type="submit" name="verify_otp">Verify and Authorize</button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+            {% endfor %}
+        {% elif search_results is not none %}
+            <p>No results found.</p>
+        {% endif %}
+    </div>
+</body>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function () {
+        const searchInput = $('#search_input');
+        const suggestionsList = $('#suggestions');
+
+        function positionSuggestions() {
+            const inputOffset = searchInput.offset();
+            const inputHeight = searchInput.outerHeight();
+
+            suggestionsList.css({
+                top: inputOffset.top + inputHeight + 'px',
+                left: inputOffset.left + 'px',
+                width: searchInput.outerWidth() + 'px',
+            });
+        }
+
+        $(window).on('resize', function () {
+            if (suggestionsList.is(':visible')) {
+                positionSuggestions();
+            }
+        });
+
+        searchInput.on('input', function () {
+            var searchTerm = $(this).val().trim();
+            if (searchTerm.length >= 2) {
+                $.ajax({
+                    url: "/autocomplete",
+                    data: { search_term: searchTerm },
+                    success: function (data) {
+                        console.log("Suggestions received:", data);
+                        suggestionsList.empty();
+                        if (data.length > 0) {
+                            data.slice(0, 4).forEach(function (item) {
+                                suggestionsList.append('<li>' + item + '</li>');
+                            });
+                            positionSuggestions(); 
+                            suggestionsList.show(); 
+                        } else {
+                            suggestionsList.append('<li>No suggestions found</li>');
+                            suggestionsList.show();
+                        }
+                    },
+                    error: function (err) {
+                        console.error("Error fetching suggestions:", err);
+                    }
+                });
+            } else {
+                suggestionsList.hide();
+            }
+        });
+
+        $(document).on('click', '#suggestions li', function () {
+            var fullText = $(this).html(); 
+            var match = fullText.match(/<strong>Name - (\S+)<\/strong>/); 
+            if (match) {
+                searchInput.val(match[1]); 
+            }
+            suggestionsList.hide(); 
+        });
+
+        $(document).on('click', function (e) {
+            if (!$(e.target).closest('.search-box').length) {
+                suggestionsList.hide();
+            }
+        });
+    });
+</script>
+
+
+</html>

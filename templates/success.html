@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Success</title>
+    <style>
+        .container {
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .success-message {
+            color: #28a745;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .order-details {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .back-button {
+            padding: 8px 15px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+        .back-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-message">
+            <h2>✓ Verification Successful!</h2>
+        </div>
+        <div class="order-details">
+            <h3>Payment Order: {{ order_name }}</h3>
+            <p>OTP verification completed successfully.</p>
+            <p>Verifier Checked successfully.</p>
+            <p>Authorizer Checked successfully.</p>
+        </div>
+        <a href="/" class="back-button" onclick="clearCacheAndReload(event)">Back to Search</a>
+    </div>
+</body>
+<script>
+    function clearCacheAndReload(event) {
+        event.preventDefault(); 
+        window.location.href = window.location.href.split('?')[0] + '?cache=' + new Date().getTime();
+    }
+</script>
+
+</html>
