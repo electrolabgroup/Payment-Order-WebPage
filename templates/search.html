@@ -2,6 +2,8 @@
 <html>
 <head>
     <title>Payment Order Search</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
     <style>
         .container {
             max-width: 1400px;
@@ -131,14 +133,15 @@
 <body>
     <div class="container">
         <h1>Payment Order Search</h1>
-        
 
-        
         <div class="search-box">
             <form method="POST">
                 <input type="text" name="search_term" id="search_input" placeholder="Enter payment order name..." class="search-input">
                 <button type="submit">Search</button>
+                <a href="/logout" style="color: white; background-color: red; padding: 8px 12px; border-radius: 4px; text-decoration: none;">Logout</a>
+
             </form>
+
             <ul id="suggestions" class="suggestions-list"></ul>
         </div>
 
@@ -160,8 +163,6 @@
                     <p>Payment Order Type: {{ result['payment_order_type'] }}</p>
                     <p>Company Bank Account: {{ result['company_bank_account'] }}</p>
                     <p>Company Bank: {{ result['company_bank'] }}</p>
-                    <p>Verified: {{ result['custom_verifier_1'] }}</p>
-                    <p>Authorized: {{ result['custom_verifier_2'] }}</p>
 
                     <table class="references-table">
                         <thead>
@@ -206,7 +207,57 @@
             <p>No results found.</p>
         {% endif %}
     </div>
+
+    <script>
+        let idleTime = 0;
+        const idleInterval = 1000;
+        const idleTimeout = 60;
+        
+        function resetIdleTime() {
+            idleTime = 0;
+        }
+        
+        function autoLogout() {
+            window.location.href = '/logout';
+        }
+        
+        $(document).ready(function() {
+            const idleTimer = setInterval(function() {
+                idleTime++;
+                console.log('Idle time:', idleTime); 
+                if (idleTime >= idleTimeout) {
+                    clearInterval(idleTimer);
+                    autoLogout();
+                }
+            }, idleInterval);
+        
+            const events = [
+                'mousemove',
+                'mousedown',
+                'keypress',
+                'scroll',
+                'touchstart',
+                'click'
+            ];
+        
+            events.forEach(function(event) {
+                $(document).on(event, function() {
+                    resetIdleTime();
+                });
+            });
+        
+            $(document).ajaxStart(function() {
+                resetIdleTime();
+            });
+        });
+    </script>
+
+    <script>
+        $(document).ready(function () {
+        });
+    </script>
 </body>
+
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
     $(document).ready(function () {

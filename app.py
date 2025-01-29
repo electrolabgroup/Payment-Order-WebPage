@@ -41,6 +41,7 @@ def init_db():
                 id SERIAL PRIMARY KEY,
                 email VARCHAR(255) UNIQUE NOT NULL,
                 password VARCHAR(255) NOT NULL,
+                admin_authorise INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -72,13 +73,10 @@ def update_verifier_status(order_name):
     try:
         response = requests.put(url, headers=API_HEADERS, data=json.dumps(payload))
         if response.status_code == 200:
-            print(f"Successfully updated verifier status for {order_name}")
             return True
         else:
-            print(f"Failed to update verifier status for {order_name}. Status code: {response.status_code}")
             return False
     except Exception as e:
-        print(f"Error updating verifier status: {e}")
         return False
 
 def send_otp_email(otp, order_name, recipient_email):
@@ -98,7 +96,6 @@ def send_otp_email(otp, order_name, recipient_email):
             server.sendmail(SMTP_USERNAME, [recipient_email], msg.as_string())
         return True
     except Exception as e:
-        print(f"Error sending email: {e}")
         return False
 
 def fetch_payment_data():
@@ -114,10 +111,6 @@ def fetch_payment_data():
         data = response.json()
         df = pd.DataFrame(data['data'])
         df['posting_date'] = pd.to_datetime(df['posting_date'])
-        df['custom_verifier_1'] = df['custom_verifier_1'].replace(0,"No")
-        df['custom_verifier_1'] = df['custom_verifier_1'].replace(1,"Yes")
-        df['custom_verifier_2'] = df['custom_verifier_2'].replace(0,"No")
-        df['custom_verifier_2'] = df['custom_verifier_2'].replace(1,"Yes")
         return df
     return None
 
@@ -137,16 +130,19 @@ def login():
             conn = psycopg2.connect(**DB_CONFIG)
             cur = conn.cursor()
             
+            # Modified query to check admin_authorise
             cur.execute('SELECT * FROM Email_Users WHERE email = %s', (email,))
             user = cur.fetchone()
             
             if user and check_password_hash(user[2], password):
-                session['user_email'] = email
-                return redirect(url_for('search'))
+                if user[3] == 1:  # Check if admin_authorise is 1
+                    session['user_email'] = email
+                    return redirect(url_for('search'))
+                else:
+                    flash('Your account is pending for admin authorization.')
             else:
                 flash('Invalid email or password')
         except (Exception, Error) as error:
-            print("Error while connecting to PostgreSQL", error)
             flash('An error occurred during login')
         finally:
             if conn:
@@ -160,28 +156,37 @@ def signup():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
-        
+        confirm_password = request.form['confirm_password']
+
+        if password != confirm_password:
+            flash('Passwords do not match', 'danger')
+            return redirect(url_for('signup'))
+
+        password_pattern = r'^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$'
+        if not re.match(password_pattern, password):
+            flash('Password must contain at least 1 uppercase letter, 1 number, and 1 special character.', 'danger')
+            return redirect(url_for('signup'))
+
         try:
             conn = psycopg2.connect(**DB_CONFIG)
             cur = conn.cursor()
-            
+
             cur.execute(
-                'INSERT INTO Email_Users (email, password) VALUES (%s, %s)',
-                (email, generate_password_hash(password))
+                'INSERT INTO Email_Users (email, password, admin_authorise) VALUES (%s, %s, %s)',
+                (email, generate_password_hash(password), 0)
             )
             conn.commit()
-            flash('Registration successful! Please login.')
+            flash('Registration successful! Please wait for admin authorization.', 'success')
             return redirect(url_for('login'))
         except psycopg2.IntegrityError:
-            flash('Email already exists')
+            flash('Email already exists', 'danger')
         except (Exception, Error) as error:
-            print("Error while connecting to PostgreSQL", error)
-            flash('An error occurred during registration')
+            flash('An error occurred during registration', 'danger')
         finally:
             if conn:
                 cur.close()
                 conn.close()
-    
+
     return render_template('signup.html')
 
 @app.route('/logout')
@@ -217,8 +222,6 @@ def search():
                                 'payment_order_type': row['payment_order_type'],
                                 'company_bank_account': row['company_bank_account'],
                                 'company_bank': row['company_bank'],
-                                'custom_verifier_1': row['custom_verifier_1'],
-                                'custom_verifier_2': row['custom_verifier_2'],
                                 'references': []
                             }
                         grouped_results[order_key]['references'].append({
@@ -253,8 +256,6 @@ def search():
                                     'payment_order_type': row['payment_order_type'],
                                     'company_bank_account': row['company_bank_account'],
                                     'company_bank': row['company_bank'],
-                                    'custom_verifier_1': row['custom_verifier_1'],
-                                    'custom_verifier_2': row['custom_verifier_2'],
                                     'references': []
                                 }
                             grouped_results[order_key]['references'].append({
@@ -275,7 +276,6 @@ def search():
                 if update_verifier_status(order_name):
                     session.pop('otp', None)
                     session.pop('order_name', None)
-                    flash('Verification status updated successfully!')
                     return render_template('success.html', order_name=order_name)
                 else:
                     flash('Failed to update verification status. Please try again.')
@@ -299,8 +299,6 @@ def search():
                                     'payment_order_type': row['payment_order_type'],
                                     'company_bank_account': row['company_bank_account'],
                                     'company_bank': row['company_bank'],
-                                    'custom_verifier_1': row['custom_verifier_1'],
-                                    'custom_verifier_2': row['custom_verifier_2'],
                                     'references': []
                                 }
                             grouped_results[order_key]['references'].append({
@@ -333,6 +331,102 @@ def autocomplete():
             unique_suggestions = list(dict.fromkeys(suggestions))[:4]
             return jsonify(unique_suggestions)
     return jsonify([])
+
+@app.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    data = request.get_json()
+    email = data.get('email')
+    
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cur = conn.cursor()
+        
+        # Check if email exists
+        cur.execute('SELECT * FROM Email_Users WHERE email = %s', (email,))
+        user = cur.fetchone()
+        
+        if user:
+            # Generate OTP
+            otp = str(random.randint(100000, 999999))
+            session['reset_otp'] = otp
+            session['reset_email'] = email
+            
+            # Send OTP email
+            msg = MIMEMultipart()
+            msg['From'] = SMTP_USERNAME
+            msg['To'] = email
+            msg['Subject'] = "Password Reset OTP"
+            
+            message = f"Your OTP for password reset is: {otp}"
+            msg.attach(MIMEText(message, 'plain'))
+            
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+                server.ehlo()
+                server.starttls()
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                server.sendmail(SMTP_USERNAME, [email], msg.as_string())
+            
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'message': 'Email not found'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': 'Error sending OTP'})
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+@app.route('/verify-reset-otp', methods=['POST'])
+def verify_reset_otp():
+    data = request.get_json()
+    entered_otp = data.get('otp')
+    
+    if entered_otp == session.get('reset_otp'):
+        return jsonify({'success': True})
+    return jsonify({'success': False})
+
+@app.route('/reset-password', methods=['POST'])
+def reset_password():
+    if 'reset_email' not in session:
+        return jsonify({'success': False, 'message': 'Session expired'})
+    
+    data = request.get_json()
+    new_password = data.get('new_password')
+    confirm_password = data.get('confirm_password')
+    
+    if new_password != confirm_password:
+        return jsonify({'success': False, 'message': 'Passwords do not match'})
+    
+    # Password validation
+    password_pattern = r'^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$'
+    if not re.match(password_pattern, new_password):
+        return jsonify({
+            'success': False, 
+            'message': 'Password must contain at least 1 uppercase letter, 1 number, and 1 special character'
+        })
+    
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cur = conn.cursor()
+        
+        # Update password
+        cur.execute(
+            'UPDATE Email_Users SET password = %s WHERE email = %s',
+            (generate_password_hash(new_password), session['reset_email'])
+        )
+        conn.commit()
+        
+        # Clear session
+        session.pop('reset_otp', None)
+        session.pop('reset_email', None)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': 'Error updating password'})
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
 
 if __name__ == '__main__':
     init_db() 

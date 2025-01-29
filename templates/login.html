@@ -3,6 +3,7 @@
 <head>
     <title>Login</title>
     <style>
+        /* Previous styles remain the same */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -10,7 +11,7 @@
             background-color: #f0f2f5;
         }
         .container {
-            max-width: 400px;
+            max-width: 600px;
             margin: 100px auto;
             padding: 20px;
         }
@@ -34,7 +35,8 @@
             color: #333;
         }
         input[type="email"],
-        input[type="password"] {
+        input[type="password"],
+        input[type="text"] {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
@@ -74,6 +76,76 @@
             color: #155724;
             border: 1px solid #c3e6cb;
         }
+        .forgot-password-box {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+        .forgot-password-box h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #1a73e8;
+        }
+        .reset-step {
+            display: none;
+        }
+        .reset-step.active {
+            display: block;
+        }
+
+        /* New styles for status messages */
+        .status-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+            text-align: center;
+        }
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+    <style>
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+    
+        .password-wrapper input {
+    
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+    
+        .toggle-password {
+            position: absolute;
+            right: 10px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            width: 30px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
@@ -94,16 +166,199 @@
                     <label for="email">Email</label>
                     <input type="email" id="email" name="email" required>
                 </div>
-                <div class="form-group">
+
+                <!-- <div class="form-group">
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password" required>
+                </div> -->
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="password" name="password" required minlength="6">
+                        <button type="button" class="toggle-password" onclick="togglePassword('password', 'lock-icon1')">👁️</button>
+                    </div>
                 </div>
                 <button type="submit" class="btn">Login</button>
             </form>
+            
             <div class="links">
                 <p>Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a></p>
+                <p>Forgot your password? <a href="#" onclick="toggleForgotPassword(); return false;">Forgot Password</a></p>
+            </div>
+
+            <!-- Forgot Password Box -->
+            <div id="forgotPasswordBox" class="forgot-password-box">
+                <h3>Reset Password</h3>
+                
+                <!-- Email Step -->
+                <div id="emailStep" class="reset-step active">
+                    <div class="form-group">
+                        <label for="resetEmail">Enter your email</label>
+                        <input type="email" id="resetEmail" required>
+                    </div>
+                    <div id="emailMessage" class="status-message"></div>
+                    <button onclick="sendOTP()" class="btn">Send OTP</button>
+                </div>
+
+                <!-- OTP Step -->
+                <div id="otpStep" class="reset-step">
+                    <div class="form-group">
+                        <label for="otp">Enter OTP</label>
+                        <input type="text" id="otp" required>
+                    </div>
+                    <div id="otpMessage" class="status-message"></div>
+                    <button onclick="verifyOTP()" class="btn">Verify OTP</button>
+                </div>
+
+                <!-- New Password Step -->
+                <div id="passwordStep" class="reset-step">
+                    <div class="form-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="password" id="newPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <input type="password" id="confirmPassword" required>
+                    </div>
+                    <div id="passwordMessage" class="status-message"></div>
+                    <button onclick="resetPassword()" class="btn">Reset Password</button>
+                </div>
             </div>
         </div>
     </div>
+
+    <script>
+        function showMessage(elementId, message, isSuccess) {
+            const messageElement = document.getElementById(elementId);
+            messageElement.textContent = message;
+            messageElement.className = 'status-message ' + (isSuccess ? 'status-success' : 'status-error');
+            messageElement.style.display = 'block';
+            
+            // Hide message after 5 seconds
+            setTimeout(() => {
+                messageElement.style.display = 'none';
+            }, 2000);
+        }
+
+        function toggleForgotPassword() {
+            const box = document.getElementById('forgotPasswordBox');
+            box.style.display = box.style.display === 'none' ? 'block' : 'none';
+            
+            // Reset to email step when opening
+            if (box.style.display === 'block') {
+                showStep('emailStep');
+                // Clear any existing messages
+                document.querySelectorAll('.status-message').forEach(msg => {
+                    msg.style.display = 'none';
+                });
+            }
+        }
+
+        function showStep(stepId) {
+            document.querySelectorAll('.reset-step').forEach(step => {
+                step.classList.remove('active');
+            });
+            document.getElementById(stepId).classList.add('active');
+        }
+
+        function sendOTP() {
+            const email = document.getElementById('resetEmail').value;
+            
+            fetch('/forgot-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email: email })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('emailMessage', 'OTP sent successfully!', true);
+                    setTimeout(() => showStep('otpStep'), 2000);
+                } else {
+                    showMessage('emailMessage', data.message || 'Email not found', false);
+                }
+            })
+            .catch(error => {
+                showMessage('emailMessage', 'Error sending OTP', false);
+            });
+        }
+
+        function verifyOTP() {
+            const otp = document.getElementById('otp').value;
+            
+            fetch('/verify-reset-otp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ otp: otp })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('otpMessage', 'OTP verified successfully!', true);
+                    setTimeout(() => showStep('passwordStep'), 2000);
+                } else {
+                    showMessage('otpMessage', 'Wrong OTP', false);
+                }
+            })
+            .catch(error => {
+                showMessage('otpMessage', 'Error verifying OTP', false);
+            });
+        }
+
+        function resetPassword() {
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            if (newPassword !== confirmPassword) {
+                showMessage('passwordMessage', 'Passwords do not match', false);
+                return;
+            }
+
+            fetch('/reset-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    new_password: newPassword,
+                    confirm_password: confirmPassword
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('passwordMessage', 'Password updated successfully!', true);
+                    setTimeout(() => {
+                        toggleForgotPassword();
+                        location.reload();
+                    }, 2000);
+                } else {
+                    showMessage('passwordMessage', data.message || 'Error updating password', false);
+                }
+            })
+            .catch(error => {
+                showMessage('passwordMessage', 'Error resetting password', false);
+            });
+        }
+    </script>
 </body>
+<script>
+    function togglePassword(fieldId, buttonId) {
+        let passwordField = document.getElementById(fieldId);
+        let button = event.target; 
+
+        if (passwordField.type === "password") {
+            passwordField.type = "text";
+            button.textContent = "👁️"; 
+        } else {
+            passwordField.type = "password";
+            button.textContent = "👁️"; 
+        }
+    }
+</script>
 </html>
