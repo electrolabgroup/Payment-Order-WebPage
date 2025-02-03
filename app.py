@@ -61,8 +61,7 @@ API_HEADERS = {
     'Content-Type': 'application/json'
 }
 
-def update_verifier_status(order_name):
-    """Update verifier status for a specific payment order"""
+def update_kotak_verifier(order_name):
     url = f"{BASE_URL}{API_ENDPOINT}/{order_name}"
     
     payload = {
@@ -72,10 +71,21 @@ def update_verifier_status(order_name):
     
     try:
         response = requests.put(url, headers=API_HEADERS, data=json.dumps(payload))
-        if response.status_code == 200:
-            return True
-        else:
-            return False
+        return response.status_code == 200
+    except Exception as e:
+        return False
+
+def update_dbs_verifier(order_name):
+    url = f"{BASE_URL}{API_ENDPOINT}/{order_name}"
+    
+    payload = {
+        "custom_verifier_1": 1,
+        "custom_verifier_2": 1
+    }   
+    
+    try:
+        response = requests.put(url, headers=API_HEADERS, data=json.dumps(payload))
+        return response.status_code == 200
     except Exception as e:
         return False
 
@@ -234,9 +244,16 @@ def search():
         
         elif 'send_otp' in request.form:
             order_name = request.form.get('order_name')
+            company_bank = request.form.get('company_bank')
+            
+            if company_bank not in ["Kotak Mahindra Bank", "DBS Bank Limited"]:
+                flash('Verification not available for this bank.')
+                return redirect(url_for('search'))
+            
             otp = str(random.randint(100000, 999999))
             session['otp'] = otp
             session['order_name'] = order_name
+            session['company_bank'] = company_bank
             
             if send_otp_email(otp, order_name, session['user_email']):
                 flash('OTP sent successfully! Please check your email.')
@@ -272,13 +289,23 @@ def search():
             entered_otp = request.form.get('otp')
             if entered_otp == session.get('otp'):
                 order_name = session.get('order_name')
+                company_bank = session.get('company_bank')
                 
-                if update_verifier_status(order_name):
+                update_success = False
+                if company_bank == "Kotak Mahindra Bank":
+                    update_success = update_kotak_verifier(order_name)
+                elif company_bank == "DBS Bank Limited":
+                    update_success = update_dbs_verifier(order_name)
+                
+                if update_success:
                     session.pop('otp', None)
                     session.pop('order_name', None)
-                    return render_template('success.html', order_name=order_name)
+                    session.pop('company_bank', None)
+                    return render_template('success.html', 
+                                        order_name=order_name, 
+                                        company_bank=company_bank)
                 else:
-                    flash('Failed to update verification status. Please try again.')
+                    flash('Failed to update verification status. Please try again.  [Tips : Check status of the Payment Order]')
                     show_otp_form = True
             else:
                 flash('Invalid OTP. Please try again.')
@@ -309,7 +336,9 @@ def search():
                             })
                         search_results = list(grouped_results.values())
     
-    return render_template('search.html', search_results=search_results, show_otp_form=show_otp_form)
+    return render_template('search.html', 
+                         search_results=search_results, 
+                         show_otp_form=show_otp_form)
 
 @app.route('/autocomplete', methods=['GET'])
 def autocomplete():
@@ -430,5 +459,7 @@ def reset_password():
 
 if __name__ == '__main__':
     init_db() 
-    # app.run(debug=True)
-    app.run(host = '0.0.0.0', port = 8000, debug=True)
+    app.run(debug=True)
+    # app.run(host = '0.0.0.0', port = 8000, debug=True)
+
+# UPDATE email_users SET admin_authorise = 1 WHERE email = 'sayed.firdous@electrolabgroup.com';

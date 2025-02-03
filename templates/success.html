@@ -3,6 +3,9 @@
 <head>
     <title>Success</title>
     <style>
+        body{
+            background-color: #008080;
+        }
         .container {
             max-width: 500px;
             margin: 50px auto;
@@ -23,6 +26,11 @@
             background-color: #f8f9fa;
             border-radius: 4px;
         }
+        .bank-info {
+            color: #0056b3;
+            font-weight: bold;
+            margin: 10px 0;
+        }
         .back-button {
             padding: 8px 15px;
             background-color: #007bff;
@@ -35,23 +43,37 @@
         .back-button:hover {
             background-color: #0056b3;
         }
+        .logout-button {
+            color: white;
+            background-color: red;
+            padding: 8px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
+    <br>
+    <br>
+    <br>
+    <br>
+    <br>
     <div class="container">
         <div class="success-message">
             <h2>✓ Verification Successful!</h2>
         </div>
+        
         <div class="order-details">
             <h3>Payment Order: {{ order_name }}</h3>
             <p>OTP verification completed successfully.</p>
-            <p>Verifier Checked successfully.</p>
-            <p>Authorizer Checked successfully.</p>
+            <p class="bank-info">Sent From <u>{{ company_bank }}</u></p>
         </div>
+        
         <a href="/" class="back-button" onclick="clearCacheAndReload(event)">Back to Search</a>
-
-        <a href="/logout" style="color: white; background-color: red; padding: 8px 12px; border-radius: 4px; text-decoration: none;">Logout</a>
-
+        <a href="/logout" class="logout-button">Logout</a>
     </div>
 </body>
 <script>
@@ -60,5 +82,4 @@
         window.location.href = window.location.href.split('?')[0] + '?cache=' + new Date().getTime();
     }
 </script>
-
 </html>
